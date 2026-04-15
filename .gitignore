@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Databricks bundle state (contains deployment metadata, not source)
+.databricks/
+
+# Local Claude settings
+.claude/
+
+# Environment / secrets
+.env
+.env.*
+*.token
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
