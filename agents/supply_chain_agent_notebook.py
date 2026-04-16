@@ -122,12 +122,18 @@ def cache_get(question: str) -> dict | None:
         WHERE question_hash = '{h}'
     """)
     try:
-        return json.loads(row["result_json"])
+        cached = json.loads(row["result_json"])
     except Exception:
-        # Corrupt cache entry — delete it and let the agent recompute
+        cached = None
+
+    # Validate — delete and recompute if corrupt or failed answer
+    answer_text = (cached or {}).get("result", {}).get("answer", "") if cached else ""
+    if not cached or "iteration limit" in answer_text.lower():
         h = cache_hash(question)
         spark.sql(f"DELETE FROM {CATALOG}.{SCHEMA}.answer_cache WHERE question_hash = '{h}'")
         return None
+
+    return cached
 
 def cache_put(question: str, result: dict, query_type: str, subgraph_type: str = "") -> None:
     from pyspark.sql.types import StructType, StructField, StringType, TimestampType, IntegerType, LongType
@@ -602,7 +608,10 @@ def route_and_answer(question: str, route_override: str = "auto") -> dict:
         result = graph_agent_answer(question, tool_input.get("subgraph_type", "full_network"))
 
     payload = {"route": route, "result": result, "from_cache": False}
-    cache_put(question, payload, route, tool_input.get("subgraph_type", ""))
+    # Only cache successful answers
+    answer_text = result.get("answer", "")
+    if answer_text and "iteration limit" not in answer_text.lower():
+        cache_put(question, payload, route, tool_input.get("subgraph_type", ""))
     return payload
 
 print("Router ready.")
