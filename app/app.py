@@ -293,7 +293,7 @@ def sql_agent(question: str, relevant_tables: list) -> dict:
             for b in resp.content:
                 if b.type != "tool_use":
                     continue
-                logger.info("[SQL] %s", b.input.get("description", ""))
+                logger.info("[SQL] %s\n%s", b.input.get("description", ""), b.input.get("sql", ""))
                 try:
                     rows = run_sql(b.input["sql"])
                     queries.append({"sql": b.input["sql"], "rows": rows})
@@ -322,7 +322,7 @@ def graph_agent(question: str, subgraph_type: str) -> dict:
             for b in resp.content:
                 if b.type != "tool_use":
                     continue
-                logger.info("[Cypher] %s", b.input.get("description", ""))
+                logger.info("[Cypher] %s\n%s", b.input.get("description", ""), b.input.get("cypher", ""))
                 try:
                     rows = neo4j_query(b.input["cypher"])
                     queries.append({"cypher": b.input["cypher"], "rows": rows})
