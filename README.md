@@ -47,6 +47,8 @@ User Question
 | Pipeline | Lakeflow Spark Declarative Pipelines (SQL) |
 | Agent framework | Claude Opus 4.6 (Anthropic SDK) — tool use + adaptive thinking |
 | Graph database | Neo4j AuraDB |
+| Application hosting | Databricks Apps (Serverless Compute) |
+| UI framework | Gradio (`gr.ChatInterface`) |
 | Orchestration | Databricks Asset Bundles (DAB) |
 | Data generation | Spark + Faker + Pandas UDFs |
 
@@ -100,6 +102,11 @@ supply-chain-optimizer/
 │   ├── connector.py                        # Neo4j driver + subgraph projectors
 │   └── queries.py                          # Pre-built Cypher query library
 │
+├── app/                                    # Databricks App (Serverless Compute)
+│   ├── app.py                              # Gradio ChatInterface + router/SQL/graph agents
+│   ├── app.yaml                            # Databricks Apps config (command + env vars)
+│   └── requirements.txt                    # App dependencies (anthropic, neo4j, gradio, databricks-sdk)
+│
 └── main.py                                 # Local CLI entry point
 ```
 
@@ -144,9 +151,14 @@ supply-chain-optimizer/
 
 ### Prerequisites
 
-- Databricks workspace (serverless enabled)
-- Neo4j AuraDB instance
-- Anthropic API key (Default workspace)
+| Requirement | Notes |
+|-------------|-------|
+| Databricks workspace | Serverless compute + Unity Catalog + Databricks Apps enabled |
+| Databricks CLI | v0.200+ — install via `pip install databricks-cli` or [docs](https://docs.databricks.com/dev-tools/cli/index.html) |
+| Python | 3.11+ (for local development) |
+| Anthropic API key | Requires access to `claude-opus-4-6` model |
+| Neo4j AuraDB instance | Free tier works — note the URI, username, and password |
+| Unity Catalog | `supplychain` catalog and `supply_chain_medallion` schema must exist before running the pipeline |
 
 ### 1. Store Secrets
 
@@ -174,19 +186,11 @@ Open `agents/supply_chain_agent_notebook` in your Databricks workspace:
 - **Run All** once to initialize
 - Update the **Question** widget and run the last cell for each query
 
-### 5. Deploy the Databricks App
+### 5. Deploy the Application on Databricks Apps (Serverless Compute)
 
-#### 5a. Grant the app service principal access to the secret scope
+The `app/` directory contains a Gradio chat application that runs entirely on Databricks serverless compute — no external hosting needed. It embeds the full router + SQL + graph agent stack and reads secrets directly from the Databricks secret scope.
 
-Before deploying, ensure the `supply_chain` secret scope exists with the required secrets:
-
-```bash
-databricks secrets create-scope supply_chain
-databricks secrets put-secret supply_chain anthropic_api_key --string-value sk-ant-...
-databricks secrets put-secret supply_chain neo4j_password    --string-value <password>
-```
-
-#### 5b. Upload and deploy
+#### 5a. Upload and deploy
 
 ```bash
 databricks workspace import-dir app /Workspace/Users/<your-email>/supply-chain-optimizer --overwrite
@@ -194,7 +198,7 @@ databricks apps deploy supply-chain-optimizer \
   --source-code-path /Workspace/Users/<your-email>/supply-chain-optimizer
 ```
 
-#### 5c. Grant the app service principal permissions
+#### 5b. Grant the app service principal permissions
 
 After the first deploy, retrieve the app's service principal client ID:
 
@@ -220,7 +224,7 @@ databricks grants update table supplychain.supply_chain_medallion.answer_cache \
   --json "{\"changes\": [{\"principal\": \"$SP\", \"add\": [\"MODIFY\"]}]}"
 ```
 
-#### 5d. Re-deploying after code changes
+#### 5c. Re-deploying after code changes
 
 ```bash
 databricks workspace import-dir app /Workspace/Users/<your-email>/supply-chain-optimizer --overwrite
@@ -228,7 +232,7 @@ databricks apps deploy supply-chain-optimizer \
   --source-code-path /Workspace/Users/<your-email>/supply-chain-optimizer
 ```
 
-#### App
+#### Application Running on Databricks Apps (Serverless Compute)
 
 ![Databricks App](docs/databricks_app.png)
 
