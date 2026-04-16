@@ -213,7 +213,7 @@ def project_subgraph(subgraph_type: str) -> str:
         total += neo4j_write_batch(rows, "UNWIND $rows AS r MERGE (s:Supplier {id: r.supplier_id}) SET s.name=r.name, s.country=r.country, s.tier=r.tier, s.reliability_score=toFloat(r.reliability_score), s.risk_score=toFloat(r.risk_score), s.risk_tier=r.risk_tier")
         rows = run_sql(f"SELECT DISTINCT part_id, part_name AS name, category, is_critical FROM {CATALOG}.{SCHEMA}.gold_part_availability LIMIT 500")
         total += neo4j_write_batch(rows, "UNWIND $rows AS r MERGE (p:Part {id: r.part_id}) SET p.name=r.name, p.category=r.category, p.is_critical=r.is_critical")
-        rows = run_sql(f"SELECT supplier_id, part_id, COUNT(*) AS po_count, AVG(aging_days) AS avg_delay_days FROM {CATALOG}.{SCHEMA}.gold_active_purchase_orders GROUP BY supplier_id, part_id LIMIT 2000")
+        rows = run_sql(f"SELECT supplier_id, part_id, COUNT(*) AS po_count, AVG(age_days) AS avg_delay_days FROM {CATALOG}.{SCHEMA}.gold_active_purchase_orders GROUP BY supplier_id, part_id LIMIT 2000")
         total += neo4j_write_batch(rows, "UNWIND $rows AS r MATCH (s:Supplier {id: r.supplier_id}) MATCH (p:Part {id: r.part_id}) MERGE (s)-[rel:SUPPLIES]->(p) SET rel.po_count=toInteger(r.po_count), rel.avg_delay_days=toFloat(r.avg_delay_days)")
     elif subgraph_type == "bom_dependency":
         rows = run_sql(f"SELECT top_parent_part_id AS part_id, top_parent_name AS name, top_parent_category AS category FROM {CATALOG}.{SCHEMA}.gold_bom_explosion UNION SELECT component_part_id, component_name, component_category FROM {CATALOG}.{SCHEMA}.gold_bom_explosion LIMIT 1000")
@@ -387,7 +387,7 @@ def chat(message: str, history: list) -> str:
 demo = gr.ChatInterface(
     fn=chat,
     title="Supply Chain Optimizer",
-    description="Ask questions about supplier risk, part availability, shipment disruptions, and BOM dependencies. The agent automatically routes to **SQL** (Delta Lake) or **Graph** (Neo4j) based on your question.",
+    description="Ask questions about supplier risk, part availability, shipment disruptions, and BOM dependencies. Routes to **SQL** (Delta Lake) or **Graph** (Neo4j) automatically.",
     examples=EXAMPLE_QUESTIONS,
     theme=gr.themes.Soft(),
 )
