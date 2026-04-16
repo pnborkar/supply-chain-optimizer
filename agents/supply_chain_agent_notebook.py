@@ -355,11 +355,13 @@ class Neo4jConnector:
         "supplier_risk":  "MATCH ()-[:SUPPLIES]->() RETURN count(*) AS n",
         "bom_dependency": "MATCH ()-[:REQUIRES]->() RETURN count(*) AS n",
         "shipment_route": "MATCH ()-[:SHIPS_TO]->()  RETURN count(*) AS n",
-        "full_network":   "MATCH ()-[r]->()           RETURN count(r) AS n",
     }
 
     def _already_projected(self, subgraph_type: str) -> bool:
         """Return True if the subgraph already has data in Neo4j."""
+        if subgraph_type == "full_network":
+            # full_network is only complete when ALL three sub-graphs exist
+            return all(self._already_projected(t) for t in ["supplier_risk", "bom_dependency", "shipment_route"])
         cypher = self._EXISTENCE_CHECKS.get(subgraph_type)
         if not cypher:
             return False
