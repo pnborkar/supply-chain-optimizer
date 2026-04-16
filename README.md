@@ -232,7 +232,7 @@ databricks apps deploy supply-chain-optimizer \
   --source-code-path /Workspace/Users/<your-email>/supply-chain-optimizer
 ```
 
-#### Application Running on Databricks Apps (Serverless Compute)
+## Application Running on Databricks Apps (Serverless Compute)
 
 ![Databricks App](docs/databricks_app.png)
 
