@@ -32,5 +32,8 @@ env/
 # Jupyter checkpoints
 .ipynb_checkpoints/
 
+# Superseded by supply_chain_agents_run.ipynb
+agents/supply_chain_agent_notebook.py
+
 # Logs
 *.log
