@@ -518,6 +518,17 @@ def sql_agent_answer(question: str, relevant_tables: list[str]) -> dict:
 # ── Graph Agent ───────────────────────────────────────────────────────────────
 
 def graph_agent_answer(question: str, subgraph_type: str) -> dict:
+    # Proactively ensure the right subgraphs are in Neo4j before Claude starts.
+    # Maps subgraph_type → which sub-projections are needed.
+    _required = {
+        "supplier_risk":  ["supplier_risk"],
+        "bom_dependency": ["bom_dependency"],
+        "shipment_route": ["shipment_route"],
+        "full_network":   ["supplier_risk", "bom_dependency", "shipment_route"],
+    }
+    for sg in _required.get(subgraph_type, [subgraph_type]):
+        neo4j.project_subgraph(sg)
+
     messages = [{"role": "user", "content": question}]
     cypher_queries = []
     nodes_projected = None
