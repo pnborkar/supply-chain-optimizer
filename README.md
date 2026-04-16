@@ -174,6 +174,64 @@ Open `agents/supply_chain_agent_notebook` in your Databricks workspace:
 - **Run All** once to initialize
 - Update the **Question** widget and run the last cell for each query
 
+### 5. Deploy the Databricks App
+
+#### 5a. Grant the app service principal access to the secret scope
+
+Before deploying, ensure the `supply_chain` secret scope exists with the required secrets:
+
+```bash
+databricks secrets create-scope supply_chain
+databricks secrets put-secret supply_chain anthropic_api_key --string-value sk-ant-...
+databricks secrets put-secret supply_chain neo4j_password    --string-value <password>
+```
+
+#### 5b. Upload and deploy
+
+```bash
+databricks workspace import-dir app /Workspace/Users/<your-email>/supply-chain-optimizer --overwrite
+databricks apps deploy supply-chain-optimizer \
+  --source-code-path /Workspace/Users/<your-email>/supply-chain-optimizer
+```
+
+#### 5c. Grant the app service principal permissions
+
+After the first deploy, retrieve the app's service principal client ID:
+
+```bash
+databricks apps get supply-chain-optimizer -o json | python3 -c \
+  "import sys,json; d=json.load(sys.stdin); print(d['service_principal_client_id'])"
+```
+
+Then grant it access to secrets and Unity Catalog:
+
+```bash
+SP=<service_principal_client_id>
+
+# Secret scope
+databricks secrets put-acl supply_chain "$SP" READ
+
+# Unity Catalog
+databricks grants update catalog supplychain \
+  --json "{\"changes\": [{\"principal\": \"$SP\", \"add\": [\"USE CATALOG\"]}]}"
+databricks grants update schema supplychain.supply_chain_medallion \
+  --json "{\"changes\": [{\"principal\": \"$SP\", \"add\": [\"USE SCHEMA\", \"SELECT\"]}]}"
+databricks grants update table supplychain.supply_chain_medallion.answer_cache \
+  --json "{\"changes\": [{\"principal\": \"$SP\", \"add\": [\"MODIFY\"]}]}"
+```
+
+#### 5d. Re-deploying after code changes
+
+```bash
+databricks workspace import-dir app /Workspace/Users/<your-email>/supply-chain-optimizer --overwrite
+databricks apps deploy supply-chain-optimizer \
+  --source-code-path /Workspace/Users/<your-email>/supply-chain-optimizer
+```
+
+#### App
+
+![Databricks App](docs/databricks_app.png)
+
 ---
 
 ## Agent Routing Logic
