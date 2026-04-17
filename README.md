@@ -148,7 +148,7 @@ supply-chain-optimizer/
 ---
 
 > [!TIP]
-> **For Developers:** If you want this running in your own Databricks workspace, the easiest path is the [Databricks AI Dev Kit](https://github.com/databricks-solutions/ai-dev-kit), which handles the scaffolding and deployment. Otherwise, follow the manual steps below.
+> **For Developers:** Want this running in your own Databricks workspace? The fastest path is the [Databricks AI Dev Kit](https://github.com/databricks-solutions/ai-dev-kit) — works with Claude Code or Cursor, handles scaffolding and deployment end-to-end. Manual steps below if you'd rather set it up yourself.
 
 ---
 
