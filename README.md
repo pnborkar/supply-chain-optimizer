@@ -1,4 +1,4 @@
-# Supply Chain Optimizer
+# Neo4j-Augmented Supply Chain Optimization on Databricks
 
 An AI-powered supply chain risk and disruption analysis tool built on Databricks. Uses a multi-agent architecture to answer natural-language questions about supplier risk, part availability, shipment disruptions, and BOM dependencies — routing intelligently between SQL (Delta Lake) and graph (Neo4j AuraDB) depending on the question type.
 
@@ -6,7 +6,7 @@ An AI-powered supply chain risk and disruption analysis tool built on Databricks
 
 ## Architecture
 
-![Architecture](docs/architecture.png)
+![Architecture](docs/architecture_1.png)
 
 ### Data Flow
 
