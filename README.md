@@ -147,8 +147,8 @@ supply-chain-optimizer/
 
 ---
 
-> [!TIP]
-> **For Developers** — Frankly, if you want to add this to your own Databricks instance, just download the [Databricks AI Dev Kit](https://github.com/databricks-solutions/ai-dev-kit) and push it — it handles the scaffolding, bundle wiring, and deployment for you. The steps below are if you want to set things up manually.
+> [!IMPORTANT]
+> **For Developers:** If you want this running in your own Databricks workspace, the easiest path is the [Databricks AI Dev Kit](https://github.com/databricks-solutions/ai-dev-kit), which handles the scaffolding and deployment. Otherwise, follow the manual steps below.
 
 ---
 
