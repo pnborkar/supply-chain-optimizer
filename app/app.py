@@ -27,6 +27,12 @@ NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
 CATALOG      = os.environ.get("SUPPLYCHAIN_CATALOG", "supplychain")
 SCHEMA       = os.environ.get("SUPPLYCHAIN_SCHEMA",  "supply_chain_medallion")
 CLAUDE_MODEL = "claude-opus-4-6"
+CLAUDE_MODELS = [
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+]
+OPUS_MODELS = {"claude-opus-4-6"}
 MAX_SQL_ROWS = 200
 CACHE_TTL_HOURS = 24
 
@@ -334,17 +340,24 @@ def graph_agent(question: str, subgraph_type: str) -> dict:
 
 def route_and_answer(question: str) -> tuple[str, str]:
     """Returns (answer_markdown, route_label)"""
+    t0 = time.time()
+
     cached = cache_get(question)
     if cached:
-        route  = cached.get("route", "?").upper()
-        answer = cached.get("result", {}).get("answer", "")
-        return answer, f"✓ {route} (cached)"
+        elapsed = time.time() - t0
+        route   = cached.get("route", "?").upper()
+        answer  = cached.get("result", {}).get("answer", "")
+        logger.info("Total time: %.2fs (cache hit, route=%s)", elapsed, route)
+        return answer, f"✓ {route} (cached) — {elapsed:.1f}s"
 
+    t_router = time.time()
     resp = claude.messages.create(
         model=CLAUDE_MODEL, max_tokens=512,
         system=ROUTER_SYSTEM, tools=ROUTER_TOOLS, tool_choice={"type": "any"},
         messages=[{"role": "user", "content": question}],
     )
+    logger.info("Router: %.2fs", time.time() - t_router)
+
     tool = next((b for b in resp.content if b.type == "tool_use"), None)
     if tool is None:
         route, tool_input = "sql", {"question": question, "relevant_tables": []}
@@ -354,15 +367,20 @@ def route_and_answer(question: str) -> tuple[str, str]:
 
     logger.info("Route → %s", route.upper())
 
+    t_agent = time.time()
     if route == "sql":
         result = sql_agent(question, tool_input.get("relevant_tables", []))
     else:
         result = graph_agent(question, tool_input.get("subgraph_type", "full_network"))
+    logger.info("Agent: %.2fs", time.time() - t_agent)
+
+    elapsed = time.time() - t0
+    logger.info("Total time: %.2fs (route=%s)", elapsed, route.upper())
 
     payload = {"route": route, "result": result}
     cache_put(question, payload, route, tool_input.get("subgraph_type", ""))
 
-    return result.get("answer", "No answer returned."), f"→ {route.upper()}"
+    return result.get("answer", "No answer returned."), f"→ {route.upper()} — {elapsed:.1f}s"
 
 # ── Gradio UI ─────────────────────────────────────────────────────────────────
 EXAMPLE_QUESTIONS = [
