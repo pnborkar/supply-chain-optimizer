@@ -219,7 +219,7 @@ def project_subgraph(subgraph_type: str) -> str:
         total += neo4j_write_batch(rows, "UNWIND $rows AS r MERGE (s:Supplier {id: r.supplier_id}) SET s.name=r.name, s.country=r.country, s.tier=r.tier, s.reliability_score=toFloat(r.reliability_score), s.risk_score=toFloat(r.risk_score), s.risk_tier=r.risk_tier")
         rows = run_sql(f"SELECT DISTINCT part_id, part_name AS name, category, is_critical FROM {CATALOG}.{SCHEMA}.gold_part_availability LIMIT 500")
         total += neo4j_write_batch(rows, "UNWIND $rows AS r MERGE (p:Part {id: r.part_id}) SET p.name=r.name, p.category=r.category, p.is_critical=r.is_critical")
-        rows = run_sql(f"SELECT supplier_id, part_id, COUNT(*) AS po_count, AVG(age_days) AS avg_delay_days FROM {CATALOG}.{SCHEMA}.gold_active_purchase_orders GROUP BY supplier_id, part_id LIMIT 2000")
+        rows = run_sql(f"SELECT supplier_id, part_id, COUNT(*) AS po_count, AVG(aging_days) AS avg_delay_days FROM {CATALOG}.{SCHEMA}.gold_active_purchase_orders GROUP BY supplier_id, part_id LIMIT 2000")
         total += neo4j_write_batch(rows, "UNWIND $rows AS r MATCH (s:Supplier {id: r.supplier_id}) MATCH (p:Part {id: r.part_id}) MERGE (s)-[rel:SUPPLIES]->(p) SET rel.po_count=toInteger(r.po_count), rel.avg_delay_days=toFloat(r.avg_delay_days)")
     elif subgraph_type == "bom_dependency":
         rows = run_sql(f"SELECT top_parent_part_id AS part_id, top_parent_name AS name, top_parent_category AS category FROM {CATALOG}.{SCHEMA}.gold_bom_explosion UNION SELECT component_part_id, component_name, component_category FROM {CATALOG}.{SCHEMA}.gold_bom_explosion LIMIT 1000")
@@ -227,13 +227,90 @@ def project_subgraph(subgraph_type: str) -> str:
         rows = run_sql(f"SELECT top_parent_part_id AS parent_id, component_part_id AS child_id, cumulative_quantity, depth FROM {CATALOG}.{SCHEMA}.gold_bom_explosion LIMIT 5000")
         total += neo4j_write_batch(rows, "UNWIND $rows AS r MATCH (parent:Part {id: r.parent_id}) MATCH (child:Part {id: r.child_id}) MERGE (parent)-[rel:REQUIRES {depth: toInteger(r.depth)}]->(child) SET rel.cumulative_quantity=toFloat(r.cumulative_quantity)")
     elif subgraph_type == "shipment_route":
-        rows = run_sql(f"SELECT origin_facility_id AS facility_id FROM {CATALOG}.{SCHEMA}.gold_shipment_pipeline UNION SELECT destination_facility_id FROM {CATALOG}.{SCHEMA}.gold_shipment_pipeline LIMIT 200")
-        total += neo4j_write_batch(rows, "UNWIND $rows AS r MERGE (f:Facility {id: r.facility_id})")
-        rows = run_sql(f"SELECT shipment_id, carrier, status, delay_days, disruption_severity, origin_facility_id, destination_facility_id, route_key FROM {CATALOG}.{SCHEMA}.gold_shipment_pipeline LIMIT 2000")
-        total += neo4j_write_batch(rows, "UNWIND $rows AS r MERGE (shp:Shipment {id: r.shipment_id}) SET shp.carrier=r.carrier, shp.status=r.status, shp.delay_days=toInteger(r.delay_days), shp.disruption_severity=r.disruption_severity WITH shp, r MATCH (o:Facility {id: r.origin_facility_id}) MATCH (d:Facility {id: r.destination_facility_id}) MERGE (shp)-[:DEPARTS_FROM]->(o) MERGE (shp)-[:ARRIVES_AT]->(d) MERGE (o)-[rt:SHIPS_TO {carrier: r.carrier}]->(d) SET rt.route_key=r.route_key")
+        # Actual schema: supplier_id → facility_id (no origin/destination facility pair)
+        rows = run_sql(f"SELECT DISTINCT facility_id, facility_name AS name, destination_region AS region FROM {CATALOG}.{SCHEMA}.gold_shipment_pipeline LIMIT 200")
+        total += neo4j_write_batch(rows, "UNWIND $rows AS r MERGE (f:Facility {id: r.facility_id}) SET f.name=r.name, f.region=r.region")
+        rows = run_sql(f"SELECT shipment_id, supplier_id, facility_id, carrier, status, delay_days, disruption_severity, route_key FROM {CATALOG}.{SCHEMA}.gold_shipment_pipeline LIMIT 2000")
+        total += neo4j_write_batch(rows, "UNWIND $rows AS r MERGE (shp:Shipment {id: r.shipment_id}) SET shp.carrier=r.carrier, shp.status=r.status, shp.delay_days=toInteger(r.delay_days), shp.disruption_severity=r.disruption_severity WITH shp, r MATCH (s:Supplier {id: r.supplier_id}) MATCH (f:Facility {id: r.facility_id}) MERGE (shp)-[:DEPARTS_FROM]->(s) MERGE (shp)-[:ARRIVES_AT]->(f) MERGE (s)-[rt:SHIPS_TO {carrier: r.carrier}]->(f) SET rt.route_key=r.route_key")
 
     _projected.add(subgraph_type)
     return f"Projected '{subgraph_type}': {total} nodes/rels"
+
+# ── GDS projections ───────────────────────────────────────────────────────────
+GDS_PROJECTIONS = {
+    "bom_network": {
+        "nodes": "Part",
+        "rels": {"REQUIRES": {"properties": ["cumulative_quantity"]}},
+        "description": "Part→Part BOM graph. Use for PageRank, Betweenness Centrality, WCC, Shortest Path.",
+    },
+    "supply_risk_network": {
+        "nodes": ["Supplier", "Part"],
+        "rels": {"SUPPLIES": {"properties": ["po_count", "avg_delay_days"]}},
+        "description": "Supplier+Part bipartite graph. Use for Node Similarity, Community Detection, weighted Shortest Path.",
+    },
+    "facility_network": {
+        "nodes": ["Supplier", "Facility"],
+        "rels": {"SHIPS_TO": {"properties": []}},
+        "description": "Supplier→Facility shipping graph. Use for Betweenness Centrality, Shortest Path, Community Detection.",
+    },
+}
+
+def gds_projection_exists(name: str) -> bool:
+    try:
+        rows = neo4j_query(f"CALL gds.graph.exists('{name}') YIELD exists")
+        return bool(rows and rows[0].get("exists"))
+    except Exception as e:
+        logger.warning("GDS exists check failed: %s", e)
+        return False
+
+GDS_PROJECT_CYPHER = {
+    "bom_network": """
+        CALL gds.graph.project(
+            'bom_network',
+            'Part',
+            {REQUIRES: {type: 'REQUIRES', orientation: 'NATURAL', properties: ['cumulative_quantity']}}
+        ) YIELD graphName, nodeCount, relationshipCount
+    """,
+    "supply_risk_network": """
+        CALL gds.graph.project(
+            'supply_risk_network',
+            ['Supplier', 'Part'],
+            {SUPPLIES: {type: 'SUPPLIES', orientation: 'NATURAL', properties: ['po_count', 'avg_delay_days']}}
+        ) YIELD graphName, nodeCount, relationshipCount
+    """,
+    "facility_network": """
+        CALL gds.graph.project(
+            'facility_network',
+            ['Supplier', 'Facility'],
+            'SHIPS_TO'
+        ) YIELD graphName, nodeCount, relationshipCount
+    """,
+}
+
+# Neo4j subgraphs that must be loaded before each GDS projection
+GDS_PREREQS = {
+    "bom_network":          ["bom_dependency"],
+    "supply_risk_network":  ["supplier_risk"],
+    "facility_network":     ["shipment_route"],
+}
+
+def ensure_gds_projection(name: str) -> str:
+    # Load underlying Neo4j data first
+    for sg in GDS_PREREQS.get(name, []):
+        msg = project_subgraph(sg)
+        logger.info("[GDS prereq] %s", msg)
+
+    if gds_projection_exists(name):
+        return f"GDS projection '{name}' already exists"
+    cypher = GDS_PROJECT_CYPHER.get(name)
+    if not cypher:
+        return f"No projection definition for '{name}'"
+    try:
+        rows = neo4j_query(cypher)
+        row  = rows[0] if rows else {}
+        return f"Created GDS projection '{name}': {row.get('nodeCount',0)} nodes, {row.get('relationshipCount',0)} rels"
+    except Exception as e:
+        return f"GDS projection '{name}' failed: {e}"
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 ROUTER_SYSTEM = """You are a supply chain analytics router. Call exactly one tool — never answer in plain text.
@@ -250,14 +327,22 @@ Use route_to_graph for:
 - "What is at risk if..."
 - "Which parts/assemblies depend on supplier X"
 - Relationship chains, multi-hop dependencies
-- Network centrality, single points of failure
 - Ripple-effect or cascading impact analysis
 
-When in doubt: if the question involves IMPACT or DEPENDENCY, use graph."""
+Use route_to_gds for:
+- Bottleneck or centrality questions ("most critical node", "biggest bottleneck")
+- Network-wide scoring that requires algorithm execution (PageRank, Betweenness)
+- Cluster or community detection ("which suppliers cluster together")
+- Node similarity ("find suppliers like X", "substitutes for this part")
+- Weighted shortest path ("cheapest sourcing path", "least-delay route")
+- Connected components ("isolated parts", "disconnected subgraphs")
+
+When in doubt: IMPACT/DEPENDENCY → graph. NETWORK SCORING/CLUSTERING/PATH → gds."""
 
 ROUTER_TOOLS = [
-    {"name": "route_to_sql", "description": "Route to SQL agent.", "input_schema": {"type": "object", "properties": {"question": {"type": "string"}, "relevant_tables": {"type": "array", "items": {"type": "string"}}}, "required": ["question", "relevant_tables"]}},
-    {"name": "route_to_graph", "description": "Route to graph agent.", "input_schema": {"type": "object", "properties": {"question": {"type": "string"}, "subgraph_type": {"type": "string", "enum": ["supplier_risk", "bom_dependency", "shipment_route", "full_network"]}}, "required": ["question", "subgraph_type"]}},
+    {"name": "route_to_sql",   "description": "Route to SQL agent.", "input_schema": {"type": "object", "properties": {"question": {"type": "string"}, "relevant_tables": {"type": "array", "items": {"type": "string"}}}, "required": ["question", "relevant_tables"]}},
+    {"name": "route_to_graph", "description": "Route to graph traversal agent.", "input_schema": {"type": "object", "properties": {"question": {"type": "string"}, "subgraph_type": {"type": "string", "enum": ["supplier_risk", "bom_dependency", "shipment_route", "full_network"]}}, "required": ["question", "subgraph_type"]}},
+    {"name": "route_to_gds",   "description": "Route to GDS algorithm agent.", "input_schema": {"type": "object", "properties": {"question": {"type": "string"}, "projection": {"type": "string", "enum": ["bom_network", "supply_risk_network", "facility_network"]}}, "required": ["question", "projection"]}},
 ]
 
 SQL_SYSTEM = f"""You are a Databricks SQL analyst for a manufacturing supply chain.
@@ -279,6 +364,38 @@ Subgraphs and their relationships:
 All required subgraphs are pre-projected before you start. Run Cypher queries directly."""
 
 GRAPH_TOOLS = [{"name": "run_cypher", "description": "Run Cypher against Neo4j.", "input_schema": {"type": "object", "properties": {"cypher": {"type": "string"}, "description": {"type": "string"}}, "required": ["cypher", "description"]}}]
+
+GDS_SYSTEM = """You are a Neo4j GDS (Graph Data Science) analyst for a supply chain network.
+Three named in-memory graph projections are pre-created for you:
+
+- "bom_network"          — Part nodes, REQUIRES relationships (weight: cumulative_quantity)
+  Best for: gds.pageRank, gds.betweenness, gds.wcc, gds.shortestPath.dijkstra
+
+- "supply_risk_network"  — Supplier + Part nodes, SUPPLIES relationships (weights: po_count, avg_delay_days)
+  Best for: gds.nodeSimilarity, gds.louvain, gds.shortestPath.dijkstra (weight: avg_delay_days)
+
+- "facility_network"     — Supplier + Facility nodes, SHIPS_TO relationships (Supplier→Facility)
+  Best for: gds.betweenness, gds.shortestPath.dijkstra, gds.louvain
+
+GDS procedure patterns:
+  CALL gds.pageRank.stream("<projection>", {maxIterations: 20, dampingFactor: 0.85})
+       YIELD nodeId, score
+  CALL gds.betweenness.stream("<projection>")
+       YIELD nodeId, score
+  CALL gds.louvain.stream("<projection>")
+       YIELD nodeId, communityId
+  CALL gds.nodeSimilarity.stream("<projection>")
+       YIELD node1, node2, similarity
+  CALL gds.wcc.stream("<projection>")
+       YIELD nodeId, componentId
+  CALL gds.shortestPath.dijkstra.stream("<projection>",
+       {sourceNode: elementId(source), relationshipWeightProperty: "avg_delay_days"})
+       YIELD index, sourceNode, targetNode, totalCost, nodeIds, path
+
+Always resolve nodeId → node using gds.util.asNode(nodeId). Return names and IDs, not raw node IDs.
+Limit streamed results to top 20 unless the question asks for all."""
+
+GDS_TOOLS = [{"name": "run_gds_cypher", "description": "Run a GDS procedure or Cypher query against Neo4j.", "input_schema": {"type": "object", "properties": {"cypher": {"type": "string"}, "description": {"type": "string"}}, "required": ["cypher", "description"]}}]
 
 # ── Agents ────────────────────────────────────────────────────────────────────
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -342,6 +459,32 @@ def graph_agent(question: str, subgraph_type: str, model: str, thinking: bool) -
             messages.append({"role": "user", "content": results})
     return {"answer": "Could not complete within iteration limit.", "cypher_queries": queries, "subgraph_type": subgraph_type}
 
+def gds_agent(question: str, projection: str, model: str, thinking: bool) -> dict:
+    msg = ensure_gds_projection(projection)
+    logger.info("[GDS] %s", msg)
+
+    messages = [{"role": "user", "content": question}]
+    queries  = []
+    for _ in range(8):
+        resp = claude.messages.create(model=model, max_tokens=4096, thinking=_thinking(model, thinking), system=GDS_SYSTEM, tools=GDS_TOOLS, messages=messages)
+        messages.append({"role": "assistant", "content": resp.content})
+        if resp.stop_reason == "end_turn":
+            return {"answer": _text(resp.content), "gds_queries": queries, "projection": projection}
+        if resp.stop_reason == "tool_use":
+            results = []
+            for b in resp.content:
+                if b.type != "tool_use":
+                    continue
+                logger.info("[GDS Cypher] %s\n%s", b.input.get("description", ""), b.input.get("cypher", ""))
+                try:
+                    rows = neo4j_query(b.input["cypher"])
+                    queries.append({"cypher": b.input["cypher"], "rows": rows})
+                    results.append({"type": "tool_result", "tool_use_id": b.id, "content": json.dumps(rows[:50])})
+                except Exception as e:
+                    results.append({"type": "tool_result", "tool_use_id": b.id, "content": str(e), "is_error": True})
+            messages.append({"role": "user", "content": results})
+    return {"answer": "Could not complete within iteration limit.", "gds_queries": queries, "projection": projection}
+
 def route_and_answer(question: str, model: str = CLAUDE_MODEL, thinking: bool = False) -> tuple[str, str]:
     """Returns (answer_markdown, route_label)"""
     t0 = time.time()
@@ -366,7 +509,7 @@ def route_and_answer(question: str, model: str = CLAUDE_MODEL, thinking: bool = 
     if tool is None:
         route, tool_input = "sql", {"question": question, "relevant_tables": []}
     else:
-        route      = "sql" if tool.name == "route_to_sql" else "graph"
+        route      = {"route_to_sql": "sql", "route_to_graph": "graph", "route_to_gds": "gds"}.get(tool.name, "sql")
         tool_input = tool.input
 
     logger.info("Route → %s", route.upper())
@@ -374,6 +517,8 @@ def route_and_answer(question: str, model: str = CLAUDE_MODEL, thinking: bool = 
     t_agent = time.time()
     if route == "sql":
         result = sql_agent(question, tool_input.get("relevant_tables", []), model, thinking)
+    elif route == "gds":
+        result = gds_agent(question, tool_input.get("projection", "bom_network"), model, thinking)
     else:
         result = graph_agent(question, tool_input.get("subgraph_type", "full_network"), model, thinking)
     logger.info("Agent (%s, thinking=%s): %.2fs", model, thinking, time.time() - t_agent)
@@ -398,6 +543,12 @@ EXAMPLE_QUESTIONS = [
     "What assemblies would be affected if a Tier-1 supplier from China is disrupted?",
     "Show me the most depended-upon components in the BOM network",
     "Which carrier routes have the most disrupted shipments?",
+    "Which parts are the biggest structural bottlenecks in the BOM? (GDS Betweenness Centrality)",
+    "Rank parts by how many assemblies depend on them using PageRank (GDS)",
+    "Which suppliers have the most similar part portfolios? (GDS Node Similarity)",
+    "Detect supplier-part communities — which clusters are most exposed to risk? (GDS Louvain)",
+    "Which facilities are the most critical routing hubs in the shipment network? (GDS Betweenness)",
+    "Are there any isolated or disconnected parts in the BOM? (GDS WCC)",
 ]
 
 def chat(message: str, history: list, model: str, thinking: bool) -> str:
