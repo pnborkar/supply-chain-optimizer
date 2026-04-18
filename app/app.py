@@ -377,6 +377,12 @@ Three named in-memory graph projections are pre-created for you:
 - "facility_network"     — Supplier + Facility nodes, SHIPS_TO relationships (Supplier→Facility)
   Best for: gds.betweenness, gds.shortestPath.dijkstra, gds.louvain
 
+Node properties (use these exact names):
+- Supplier: id, name, country, tier, reliability_score, risk_score, risk_tier
+- Part:     id, name, category, is_critical
+- Facility: id, name, region
+- Shipment: id, carrier, status, delay_days, disruption_severity
+
 GDS procedure patterns:
   CALL gds.pageRank.stream("<projection>", {maxIterations: 20, dampingFactor: 0.85})
        YIELD nodeId, score
@@ -558,28 +564,96 @@ def chat(message: str, history: list, model: str, thinking: bool) -> str:
     answer, route_label = route_and_answer(message, model, thinking)
     return f"**[{route_label}]**\n\n{answer}"
 
-demo = gr.ChatInterface(
-    fn=chat,
-    title="Supply Chain Optimizer",
-    description="Ask questions about supplier risk, part availability, shipment disruptions, and BOM dependencies. Routes to **SQL** (Delta Lake) or **Graph** (Neo4j) automatically.",
-    examples=[[q, "claude-sonnet-4-6", False] for q in EXAMPLE_QUESTIONS],
-    chatbot=gr.Chatbot(height=650),
-    theme=gr.themes.Soft(),
-    additional_inputs=[
-        gr.Dropdown(
-            choices=CLAUDE_MODELS,
-            value="claude-sonnet-4-6",
-            label="Model",
-            info="Sonnet is faster for SQL; Opus is better for complex graph reasoning.",
-        ),
-        gr.Checkbox(
-            value=False,
-            label="Adaptive Thinking (Opus only)",
-            info="Enables extended thinking — slower but better for complex multi-hop queries.",
-        ),
-    ],
-    additional_inputs_accordion=gr.Accordion(label="⚙️ Model Settings", open=False),
-)
+CUSTOM_CSS = """
+.input-container textarea {
+    background-color: #f0f7ff !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 10px !important;
+    font-size: 15px !important;
+    color: #1e293b !important;
+}
+.input-container textarea:focus {
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+.input-container textarea::placeholder {
+    color: #94a3b8 !important;
+}
+"""
+
+def get_status() -> str:
+    lines = ["### Neo4j AuraDB — Node Counts"]
+    try:
+        rows = neo4j_query("MATCH (n) RETURN labels(n)[0] AS label, count(n) AS count ORDER BY count DESC")
+        if rows:
+            lines.append("| Label | Count |")
+            lines.append("|-------|-------|")
+            for r in rows:
+                lines.append(f"| {r.get('label','?')} | {r.get('count',0)} |")
+        else:
+            lines.append("_No nodes found._")
+    except Exception as e:
+        lines.append(f"_Error: {e}_")
+
+    lines.append("\n### Neo4j AuraDB — Relationship Counts")
+    try:
+        rows = neo4j_query("MATCH ()-[r]->() RETURN type(r) AS rel_type, count(r) AS count ORDER BY count DESC")
+        if rows:
+            lines.append("| Relationship | Count |")
+            lines.append("|-------------|-------|")
+            for r in rows:
+                lines.append(f"| {r.get('rel_type','?')} | {r.get('count',0)} |")
+        else:
+            lines.append("_No relationships found._")
+    except Exception as e:
+        lines.append(f"_Error: {e}_")
+
+    lines.append("\n### GDS Named Graph Projections")
+    try:
+        rows = neo4j_query("CALL gds.graph.list() YIELD graphName, nodeCount, relationshipCount, creationTime")
+        if rows:
+            lines.append("| Projection | Nodes | Relationships | Created |")
+            lines.append("|-----------|-------|---------------|---------|")
+            for r in rows:
+                lines.append(f"| {r['graphName']} | {r['nodeCount']} | {r['relationshipCount']} | {str(r.get('creationTime',''))[:19]} |")
+        else:
+            lines.append("_No GDS projections in memory._")
+    except Exception as e:
+        lines.append(f"_Error: {e}_")
+
+    return "\n".join(lines)
+
+with gr.Blocks(theme=gr.themes.Soft(), css=CUSTOM_CSS) as demo:
+    gr.Markdown("# Supply Chain Optimizer")
+    gr.Markdown("Ask questions about supplier risk, part availability, shipment disruptions, and BOM dependencies. Routes to **SQL** (Delta Lake), **Graph** (Neo4j), or **GDS** (graph algorithms) automatically.")
+    with gr.Tabs():
+        with gr.Tab("💬 Chat"):
+            gr.ChatInterface(
+                fn=chat,
+                title=None,
+                description=None,
+                examples=[[q, "claude-sonnet-4-6", False] for q in EXAMPLE_QUESTIONS],
+                chatbot=gr.Chatbot(height=650),
+                textbox=gr.Textbox(placeholder="Ask a supply chain question...", container=False, elem_classes=["input-container"]),
+                additional_inputs=[
+                    gr.Dropdown(
+                        choices=CLAUDE_MODELS,
+                        value="claude-sonnet-4-6",
+                        label="Model",
+                        info="Sonnet is faster for SQL; Opus is better for complex graph reasoning.",
+                    ),
+                    gr.Checkbox(
+                        value=False,
+                        label="Adaptive Thinking (Opus only)",
+                        info="Enables extended thinking — slower but better for complex multi-hop queries.",
+                    ),
+                ],
+                additional_inputs_accordion=gr.Accordion(label="⚙️ Model Settings", open=False),
+            )
+        with gr.Tab("📊 Status"):
+            status_output = gr.Markdown()
+            gr.Button("Refresh", variant="primary").click(fn=get_status, outputs=status_output)
+            demo.load(fn=get_status, outputs=status_output)
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 8000)))
