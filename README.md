@@ -337,7 +337,7 @@ Are there any isolated or disconnected parts in the BOM? (WCC)
 
 ## Roadmap
 
-### Phase 4 — Richer Data Model & New Query Capabilities
+### Richer Data Model & New Query Capabilities
 
 The current dataset is sufficient for a compelling demo. The additions below would unlock the next tier of supply chain questions.
 
