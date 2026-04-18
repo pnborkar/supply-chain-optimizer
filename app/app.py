@@ -286,11 +286,16 @@ claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 def _text(content):
     return "\n".join(b.text for b in content if hasattr(b, "type") and b.type == "text").strip()
 
-def sql_agent(question: str, relevant_tables: list) -> dict:
+def _thinking(model: str, enabled: bool) -> dict:
+    if enabled and model in OPUS_MODELS:
+        return {"type": "adaptive"}
+    return {"type": "disabled"}
+
+def sql_agent(question: str, relevant_tables: list, model: str, thinking: bool) -> dict:
     messages = [{"role": "user", "content": question}]
     queries = []
     for _ in range(6):
-        resp = claude.messages.create(model=CLAUDE_MODEL, max_tokens=4096, thinking={"type": "adaptive"}, system=SQL_SYSTEM, tools=SQL_TOOLS, messages=messages)
+        resp = claude.messages.create(model=model, max_tokens=4096, thinking=_thinking(model, thinking), system=SQL_SYSTEM, tools=SQL_TOOLS, messages=messages)
         messages.append({"role": "assistant", "content": resp.content})
         if resp.stop_reason == "end_turn":
             return {"answer": _text(resp.content), "queries": queries}
@@ -309,8 +314,7 @@ def sql_agent(question: str, relevant_tables: list) -> dict:
             messages.append({"role": "user", "content": results})
     return {"answer": "Could not complete within iteration limit.", "queries": queries}
 
-def graph_agent(question: str, subgraph_type: str) -> dict:
-    # Pre-project required subgraphs
+def graph_agent(question: str, subgraph_type: str, model: str, thinking: bool) -> dict:
     required = {"supplier_risk": ["supplier_risk"], "bom_dependency": ["bom_dependency"], "shipment_route": ["shipment_route"], "full_network": ["supplier_risk", "bom_dependency", "shipment_route"]}
     for sg in required.get(subgraph_type, [subgraph_type]):
         msg = project_subgraph(sg)
@@ -319,7 +323,7 @@ def graph_agent(question: str, subgraph_type: str) -> dict:
     messages = [{"role": "user", "content": question}]
     queries = []
     for _ in range(8):
-        resp = claude.messages.create(model=CLAUDE_MODEL, max_tokens=4096, thinking={"type": "adaptive"}, system=GRAPH_SYSTEM, tools=GRAPH_TOOLS, messages=messages)
+        resp = claude.messages.create(model=model, max_tokens=4096, thinking=_thinking(model, thinking), system=GRAPH_SYSTEM, tools=GRAPH_TOOLS, messages=messages)
         messages.append({"role": "assistant", "content": resp.content})
         if resp.stop_reason == "end_turn":
             return {"answer": _text(resp.content), "cypher_queries": queries, "subgraph_type": subgraph_type}
@@ -338,7 +342,7 @@ def graph_agent(question: str, subgraph_type: str) -> dict:
             messages.append({"role": "user", "content": results})
     return {"answer": "Could not complete within iteration limit.", "cypher_queries": queries, "subgraph_type": subgraph_type}
 
-def route_and_answer(question: str) -> tuple[str, str]:
+def route_and_answer(question: str, model: str = CLAUDE_MODEL, thinking: bool = False) -> tuple[str, str]:
     """Returns (answer_markdown, route_label)"""
     t0 = time.time()
 
@@ -352,7 +356,7 @@ def route_and_answer(question: str) -> tuple[str, str]:
 
     t_router = time.time()
     resp = claude.messages.create(
-        model=CLAUDE_MODEL, max_tokens=512,
+        model=model, max_tokens=512,
         system=ROUTER_SYSTEM, tools=ROUTER_TOOLS, tool_choice={"type": "any"},
         messages=[{"role": "user", "content": question}],
     )
@@ -369,10 +373,10 @@ def route_and_answer(question: str) -> tuple[str, str]:
 
     t_agent = time.time()
     if route == "sql":
-        result = sql_agent(question, tool_input.get("relevant_tables", []))
+        result = sql_agent(question, tool_input.get("relevant_tables", []), model, thinking)
     else:
-        result = graph_agent(question, tool_input.get("subgraph_type", "full_network"))
-    logger.info("Agent: %.2fs", time.time() - t_agent)
+        result = graph_agent(question, tool_input.get("subgraph_type", "full_network"), model, thinking)
+    logger.info("Agent (%s, thinking=%s): %.2fs", model, thinking, time.time() - t_agent)
 
     elapsed = time.time() - t0
     logger.info("Total time: %.2fs (route=%s)", elapsed, route.upper())
@@ -396,18 +400,34 @@ EXAMPLE_QUESTIONS = [
     "Which carrier routes have the most disrupted shipments?",
 ]
 
-def chat(message: str, history: list) -> str:
+def chat(message: str, history: list, model: str, thinking: bool) -> str:
     if not message.strip():
         return ""
-    answer, route_label = route_and_answer(message)
+    logger.info("Request — model=%s thinking=%s", model, thinking)
+    answer, route_label = route_and_answer(message, model, thinking)
     return f"**[{route_label}]**\n\n{answer}"
 
 demo = gr.ChatInterface(
     fn=chat,
     title="Supply Chain Optimizer",
     description="Ask questions about supplier risk, part availability, shipment disruptions, and BOM dependencies. Routes to **SQL** (Delta Lake) or **Graph** (Neo4j) automatically.",
-    examples=EXAMPLE_QUESTIONS,
+    examples=[[q, "claude-sonnet-4-6", False] for q in EXAMPLE_QUESTIONS],
+    chatbot=gr.Chatbot(height=650),
     theme=gr.themes.Soft(),
+    additional_inputs=[
+        gr.Dropdown(
+            choices=CLAUDE_MODELS,
+            value="claude-sonnet-4-6",
+            label="Model",
+            info="Sonnet is faster for SQL; Opus is better for complex graph reasoning.",
+        ),
+        gr.Checkbox(
+            value=False,
+            label="Adaptive Thinking (Opus only)",
+            info="Enables extended thinking — slower but better for complex multi-hop queries.",
+        ),
+    ],
+    additional_inputs_accordion=gr.Accordion(label="⚙️ Model Settings", open=False),
 )
 
 if __name__ == "__main__":
