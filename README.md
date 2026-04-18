@@ -332,3 +332,61 @@ Detect supplier-part communities — which clusters are most exposed to risk? (L
 Which facilities are the most critical routing hubs in the shipment network?
 Are there any isolated or disconnected parts in the BOM? (WCC)
 ```
+
+---
+
+## Roadmap
+
+### Phase 4 — Richer Data Model & New Query Capabilities
+
+The current dataset is sufficient for a compelling demo. The additions below would unlock the next tier of supply chain questions.
+
+#### High-Value Column Additions
+
+| Column | Table | Unlocks |
+|--------|-------|---------|
+| `lead_time_days` | Suppliers | "Which suppliers have both high risk AND long lead times?" |
+| `contract_expiry_date` | Suppliers | "Which critical supplier contracts expire in the next 90 days?" |
+| `on_time_delivery_rate` | Suppliers | More accurate risk score input than delay_days alone |
+| `days_of_supply` | Part availability | "Which critical parts will stock out first?" |
+| `substitute_part_id` | Parts | Graph query: find an alternative part when a component fails |
+
+#### New Entity: Risk Events
+
+A `risk_events` table mapping external disruptions (weather, port strikes, geopolitical events) to affected suppliers, facilities, or countries. This unlocks the most realistic supply chain question:
+
+> *"What parts are at risk due to the port strike in Shanghai?"*
+
+Would require:
+- New synthetic data generator for risk events
+- New bronze/silver/gold pipeline tables
+- New graph edges: `(:RiskEvent)-[:AFFECTS]->(:Facility|:Supplier)`
+- Router updated to recognize disruption-event questions
+
+#### Impact on GDS
+
+`substitute_part_id` would add a new relationship type `(:Part)-[:SUBSTITUTE_FOR]->(:Part)` enabling a new GDS projection for alternative sourcing path analysis (Dijkstra with fallback routing).
+
+---
+
+#### MLflow Tracing & Evaluation
+
+The current agents are raw Anthropic SDK calls with no observability. MLflow integration would add three layers:
+
+**1. MLflow Tracing** *(low effort, high value)*
+Instrument every agent call to capture latency, token usage, tool calls, and routing decisions — giving a full audit trail of what Claude did on each question.
+```python
+import mlflow
+mlflow.anthropic.autolog()  # traces all Claude API calls automatically
+```
+
+**2. MLflow Evaluation** *(medium effort)*
+Run LLM-as-judge scoring across SQL, Graph, and GDS routes to automatically assess answer quality (correctness, relevance, completeness). Useful for comparing Sonnet vs Opus answer quality systematically.
+```python
+mlflow.evaluate(data=questions_df, model=agent, evaluators=["default"])
+```
+
+**3. Databricks Agent Framework** *(productionization)*
+Wrap agents as proper MLflow models, serve via Databricks Model Serving endpoints, and register tools in Unity Catalog. Moves the agent stack out of the Gradio app into a production-grade serving layer.
+
+> **Recommendation:** Add tracing first (instrumentation only, no code restructure needed), evaluation second, Agent Framework last if moving beyond demo.
