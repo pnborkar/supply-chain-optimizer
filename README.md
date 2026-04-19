@@ -41,18 +41,30 @@ User Question
 
 ## Table of Contents
 
+<table>
+<tr>
+<td>
+
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Data Model](#data-model)
 - [Setup](#setup)
 - [Application Running on Databricks Apps](#application-running-on-databricks-apps-serverless-compute)
+
+</td>
+<td>
+
 - [Agent Routing Logic](#agent-routing-logic)
 - [Progressive Graph Projection](#progressive-graph-projection)
 - [GDS Graph Algorithms](#gds-graph-algorithms)
 - [Answer Cache](#answer-cache)
 - [Example Questions](#example-questions)
 - [Roadmap](#roadmap)
+
+</td>
+</tr>
+</table>
 
 ---
 
