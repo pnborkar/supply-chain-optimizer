@@ -373,20 +373,20 @@ Would require:
 
 The current agents are raw Anthropic SDK calls with no observability. MLflow integration would add three layers:
 
-**1. MLflow Tracing** *(low effort, high value)*
+**1. MLflow Tracing**
 Instrument every agent call to capture latency, token usage, tool calls, and routing decisions — giving a full audit trail of what Claude did on each question.
 ```python
 import mlflow
 mlflow.anthropic.autolog()  # traces all Claude API calls automatically
 ```
 
-**2. MLflow Evaluation** *(medium effort)*
+**2. MLflow Evaluation**
 Run LLM-as-judge scoring across SQL, Graph, and GDS routes to automatically assess answer quality (correctness, relevance, completeness). Useful for comparing Sonnet vs Opus answer quality systematically.
 ```python
 mlflow.evaluate(data=questions_df, model=agent, evaluators=["default"])
 ```
 
-**3. Databricks Agent Framework** *(productionization)*
+**3. Databricks Agent Framework**
 Wrap agents as proper MLflow models, serve via Databricks Model Serving endpoints, and register tools in Unity Catalog. Moves the agent stack out of the Gradio app into a production-grade serving layer.
 
 > **Recommendation:** Add tracing first (instrumentation only, no code restructure needed), evaluation second, Agent Framework last if moving beyond demo.
