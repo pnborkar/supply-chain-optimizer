@@ -4,6 +4,23 @@ An AI-powered supply chain risk and disruption analysis tool built on Databricks
 
 ---
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Data Model](#data-model)
+- [Setup](#setup)
+- [Application Running on Databricks Apps](#application-running-on-databricks-apps-serverless-compute)
+- [Agent Routing Logic](#agent-routing-logic)
+- [Progressive Graph Projection](#progressive-graph-projection)
+- [GDS Graph Algorithms](#gds-graph-algorithms)
+- [Answer Cache](#answer-cache)
+- [Example Questions](#example-questions)
+- [Roadmap](#roadmap)
+
+---
+
 ## Architecture
 
 ![Architecture](docs/architecture_1.png)
