@@ -87,9 +87,16 @@ User Question
 
 ## Project Structure
 
+Follow the numbered entry points in sequence to go from zero to a running app:
+
 ```
 supply-chain-optimizer/
-├── README.md
+│
+├── 01_generate_data.py                     # ① Generate + upload synthetic data
+├── 02_deploy_pipeline.sh                   # ② Deploy + run medallion pipeline
+├── 03_run_agents.py                        # ③ Run agents locally (CLI)
+├── 04_deploy_app.sh                        # ④ Deploy Gradio app to Databricks Apps
+│
 ├── databricks.yml                          # Databricks Asset Bundle config
 ├── requirements.txt                        # anthropic, neo4j, databricks-sdk
 ├── .env                                    # Credentials (gitignored)
@@ -102,31 +109,17 @@ supply-chain-optimizer/
 │   └── generate_supply_chain_data_notebook.py  # Databricks notebook version
 │
 ├── src/supply_chain_pipeline/transformations/
-│   ├── bronze_suppliers.sql                # Auto Loader → bronze streaming tables
-│   ├── bronze_parts.sql
-│   ├── bronze_facilities.sql
-│   ├── bronze_bom.sql
-│   ├── bronze_purchase_orders.sql
-│   ├── bronze_shipments.sql
-│   ├── silver_suppliers.sql                # Typed + DQ constraints
-│   ├── silver_parts.sql
-│   ├── silver_facilities.sql
-│   ├── silver_bom.sql
-│   ├── silver_purchase_orders.sql
-│   ├── silver_shipments.sql
-│   ├── gold_supplier_risk.sql              # Composite risk score 0-100
-│   ├── gold_part_availability.sql          # Stock status per part/facility
-│   ├── gold_active_purchase_orders.sql     # Open/delayed POs with aging
-│   ├── gold_shipment_pipeline.sql          # In-transit shipments + disruption severity
-│   └── gold_bom_explosion.sql              # 2-level BOM with rolled-up cost
+│   ├── bronze_*.sql                        # Auto Loader → bronze streaming tables
+│   ├── silver_*.sql                        # Typed + DQ constraints
+│   └── gold_*.sql                          # Risk scores, availability, BOM, shipments
 │
 ├── agents/
 │   ├── config.py                           # All env vars and table names
-│   ├── cache.py                            # Delta answer cache (local Python)
+│   ├── cache.py                            # Delta answer cache
 │   ├── prompts.py                          # System prompts + tool schemas
-│   ├── router.py                           # Claude router agent (local Python)
-│   ├── sql_agent.py                        # SQL agent (local Python)
-│   ├── graph_agent.py                      # Graph agent (local Python)
+│   ├── router.py                           # Claude router agent
+│   ├── sql_agent.py                        # SQL agent
+│   ├── graph_agent.py                      # Graph agent
 │   └── supply_chain_agent_notebook.py      # All-in-one Databricks notebook
 │
 ├── neo4j_graph/
@@ -134,9 +127,9 @@ supply-chain-optimizer/
 │   └── queries.py                          # Pre-built Cypher query library
 │
 ├── app/                                    # Databricks App (Serverless Compute)
-│   ├── app.py                              # Gradio ChatInterface + router/SQL/graph agents
-│   ├── app.yaml                            # Databricks Apps config (command + env vars)
-│   └── requirements.txt                    # App dependencies (anthropic, neo4j, gradio, databricks-sdk)
+│   ├── app.py                              # Gradio app — router + SQL + graph + GDS agents
+│   ├── app.yaml                            # Databricks Apps config
+│   └── requirements.txt                    # App dependencies
 │
 └── main.py                                 # Local CLI entry point
 ```
