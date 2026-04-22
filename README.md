@@ -248,9 +248,7 @@ databricks secrets put-acl supply_chain "$SP" READ
 databricks grants update catalog supplychain \
   --json "{\"changes\": [{\"principal\": \"$SP\", \"add\": [\"USE CATALOG\"]}]}"
 databricks grants update schema supplychain.supply_chain_medallion \
-  --json "{\"changes\": [{\"principal\": \"$SP\", \"add\": [\"USE SCHEMA\", \"SELECT\"]}]}"
-databricks grants update table supplychain.supply_chain_medallion.answer_cache \
-  --json "{\"changes\": [{\"principal\": \"$SP\", \"add\": [\"MODIFY\"]}]}"
+  --json "{\"changes\": [{\"principal\": \"$SP\", \"add\": [\"USE SCHEMA\", \"SELECT\", \"MODIFY\", \"CREATE TABLE\"]}]}"
 ```
 
 #### 5c. Re-deploying after code changes
