@@ -6,7 +6,7 @@ An AI-powered supply chain risk and disruption analysis tool built on Databricks
 
 ## Architecture
 
-![Architecture](docs/architecture_1.png)
+![Architecture](docs/architecture.png)
 
 ### Data Flow
 
