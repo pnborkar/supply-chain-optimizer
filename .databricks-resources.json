@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "resources": [
+    {
+      "type": "genie_space",
+      "name": "Supply Chain Analytics",
+      "id": "01f1437ae3821d56821988f7970613a0",
+      "created_at": "2026-04-29T03:24:11.658190+00:00",
+      "updated_at": "2026-04-29T03:24:11.658190+00:00"
+    },
+    {
+      "type": "multi_agent_supervisor",
+      "name": "Supply_Chain_Supervisor",
+      "id": "af2a86be-f0f0-4d1d-9b59-0bc6659c74ed",
+      "created_at": "2026-04-29T03:51:16.844211+00:00",
+      "updated_at": "2026-04-29T03:51:16.844211+00:00"
+    }
+  ]
+}
