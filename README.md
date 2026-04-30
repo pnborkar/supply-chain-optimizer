@@ -1,8 +1,8 @@
 # Neo4j-Augmented Supply Chain Optimization on Databricks
 
+[![Databricks](https://img.shields.io/badge/DATABRICKS-ENABLED-FF3621?style=for-the-badge&logo=databricks&logoColor=white)]()
 [![Neo4j](https://img.shields.io/badge/NEO4J-AuraDB-brightgreen?style=for-the-badge&logo=neo4j&logoColor=white)]()
 [![GDS](https://img.shields.io/badge/GDS-Professional-blue?style=for-the-badge)]()
-[![Databricks](https://img.shields.io/badge/DATABRICKS-ENABLED-FF3621?style=for-the-badge&logo=databricks&logoColor=white)]()
 [![Claude](https://img.shields.io/badge/CLAUDE-Sonnet_4.6-blueviolet?style=for-the-badge)]()
 [![Python](https://img.shields.io/badge/PYTHON-3.11+-yellow?style=for-the-badge&logo=python&logoColor=white)]()
 [![MLflow](https://img.shields.io/badge/MLFLOW-2.x-0194E2?style=for-the-badge&logo=mlflow&logoColor=white)]()
