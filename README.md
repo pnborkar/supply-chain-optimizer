@@ -334,6 +334,8 @@ databricks apps deploy supply-chain-optimizer \
 
 The Supervisor routes questions between two tools: **Genie Space** (SQL/Delta) and the **Neo4j MCP server** (graph traversal + GDS algorithms). The screenshot below shows both tools configured, with a live PageRank result on the right.
 
+> **Note:** The Neo4j MCP server is the preferred approach for all graph and GDS questions. It executes Cypher and GDS algorithms directly against AuraDB with no intermediate layers, no response format constraints, and no cold-start latency — producing richer, more accurate answers than the MLflow serving endpoint route.
+
 ![AgentBricks Supervisor](docs/supervisor.jpg)
 
 | Tool | Type | Handles |
@@ -504,7 +506,7 @@ Wrap agents as proper MLflow models, serve via Databricks Model Serving endpoint
 | **Neo4j MCP server** | `mcp-neo4j-supply-chain` Databricks App — deploys official `neo4j-mcp-server` package as a FastAPI proxy. Registered in Unity ML Gateway MCP Catalog. |
 | **MLflow slim agents** | Graph and GDS model files refactored — removed `WorkspaceClient`, Delta SQL reads, and subgraph projection. Agents now assume graph is pre-populated in AuraDB and read credentials from env vars. `_full` backup copies retained. |
 | **Auth fix (MCP server)** | `httpx.BasicAuth._auth_header` (private attribute, unreliable) replaced with explicit `base64.b64encode()` Basic Auth header construction. |
-| **Second workspace** | Full stack deployed to `adb-1098933906466604` (`pramod.borkar@neo4j.com`) — catalog `supplychain_optimizer`, schema `supply_chain_medallion`, secret scope `supply_chain`. |
+| **Second workspace** | Full stack deployed to `adb-1098933906466604` — catalog `supplychain_optimizer`, schema `supply_chain_medallion`, secret scope `supply_chain`. |
 
 ### Phase 1 — Core Stack
 
