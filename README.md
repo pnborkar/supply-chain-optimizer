@@ -15,7 +15,23 @@ An AI-powered supply chain risk and disruption analysis tool built on Databricks
 
 ## Architecture
 
-![Architecture](docs/architecture.png)
+<details>
+<summary><strong>Architecture 1 — Gradio App (Interactive)</strong></summary>
+
+![Architecture Gradio](docs/architecture_1.png)
+
+Route agent inside the Gradio app classifies each question and dispatches to SQL, Graph, or GDS agent. Graph is projected lazily from Delta gold tables on first use and persists in AuraDB. Answers are cached in a Delta table with a 24h TTL.
+
+</details>
+
+<details>
+<summary><strong>Architecture 2 — AgentBricks Supervisor (Production)</strong></summary>
+
+![Architecture Supervisor](docs/architecture_2.jpg)
+
+AgentBricks Supervisor routes between Genie Space (SQL/Delta) and the Neo4j MCP server (graph + GDS algorithms), hosted as a Databricks App. Unity Catalog provides governance, model routing, and audit across the full stack.
+
+</details>
 
 ### Data Flow
 
