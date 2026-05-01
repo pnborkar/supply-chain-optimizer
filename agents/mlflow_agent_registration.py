@@ -70,7 +70,7 @@ SAMPLE_INPUT = pd.DataFrame([{
 }])
 
 SAMPLE_OUTPUT = pd.DataFrame([{
-    "choices": [{"message": {"role": "assistant", "content": "Based on the graph analysis..."}, "finish_reason": "stop"}]
+    "predictions": ["Based on the graph analysis..."]
 }])
 
 with mlflow.start_run(run_name="graph_agent_registration"):

@@ -33,17 +33,57 @@ supplychain.supply_chain_medallion
   Auto Loader from volume                                    + Neo4j subgraph projection
 ```
 
-### Agent Layer
+### Agent Layer — Gradio App (Interactive)
 
 ```
 User Question
       ↓
-  Router Agent (model-selectable)
+  Router Agent (Claude — model-selectable)
       ├── route_to_sql   →  SQL Agent   →  spark.sql() on gold tables         →  Answer
       ├── route_to_graph →  Graph Agent →  project subgraph → Neo4j Cypher    →  Answer
       └── route_to_gds   →  GDS Agent   →  gds.graph.project() → algorithm    →  Answer
                                                       ↓
                                             Delta answer_cache (TTL 24h)
+```
+
+### Agent Layer — AgentBricks Supervisor (Production)
+
+```
+User Question
+      ↓
+AgentBricks Supervisor (Mosaic AI)
+      ├── Genie Space          →  SQL against gold Delta tables                →  Answer
+      ├── graph_agent()        →  UC Function → ai_query()
+      │                               ↓
+      │                        supply-chain-graph-agent (MLflow Serving Endpoint)
+      │                               ↓
+      │                        GraphAgentModel.predict() → Neo4j Cypher       →  Answer
+      └── gds_agent()          →  UC Function → ai_query()
+                                      ↓
+                               supply-chain-gds-agent (MLflow Serving Endpoint)
+                                      ↓
+                               GDSAgentModel.predict() → GDS algorithms       →  Answer
+
+MLflow Model Lifecycle:
+  graph_agent_model.py / gds_agent_model.py   (model code)
+          ↓  mlflow.pyfunc.log_model()
+  Unity Catalog Registered Model              (versioned)
+          ↓  serving endpoint points to version
+  Model Serving Endpoint                      (serverless, scale-to-zero)
+          ↓  ai_query()
+  UC Function                                 (tool in Supervisor)
+```
+
+### Neo4j Graph Population
+
+```
+Gradio App (first question) OR Pipeline Job (scheduled)
+      ↓
+  _project() reads gold Delta tables → writes Supplier/Part/Facility nodes
+      ↓
+Neo4j AuraDB (persistent — survives restarts)
+      ↓
+MLflow Serving Endpoints + MCP Server read directly (no re-projection)
 ```
 
 ---
@@ -419,3 +459,31 @@ mlflow.evaluate(data=questions_df, model=agent, evaluators=["default"])
 Wrap agents as proper MLflow models, serve via Databricks Model Serving endpoints, and register tools in Unity Catalog. Moves the agent stack out of the Gradio app into a production-grade serving layer.
 
 > **Recommendation:** Add tracing first (instrumentation only, no code restructure needed), evaluation second, Agent Framework last if moving beyond demo.
+
+---
+
+## Changelog
+
+### Phase 2 — AgentBricks Supervisor + MLflow Serving Endpoints
+
+| What | Detail |
+|------|--------|
+| **MLflow PyFunc models** | `graph_agent_model.py` and `gds_agent_model.py` — standalone model files for code-based MLflow logging. Registered in Unity Catalog as versioned models. |
+| **Serving endpoints** | `supply-chain-graph-agent` and `supply-chain-gds-agent` deployed on Databricks Model Serving (serverless, scale-to-zero). |
+| **UC function wrappers** | `graph_agent()` and `gds_agent()` UC functions in `supplychain_optimizer.supply_chain_medallion` — wrap serving endpoints via `ai_query()` for Supervisor tool use. |
+| **AgentBricks Supervisor** | Supply Chain Supervisor created with Genie Space (SQL) + UC function tools (Graph + GDS). |
+| **Neo4j MCP server** | `mcp-neo4j-supply-chain` Databricks App — deploys official `neo4j-mcp-server` package as a FastAPI proxy. Registered in Unity ML Gateway MCP Catalog. |
+| **MLflow slim agents** | Graph and GDS model files refactored — removed `WorkspaceClient`, Delta SQL reads, and subgraph projection. Agents now assume graph is pre-populated in AuraDB and read credentials from env vars. `_full` backup copies retained. |
+| **Auth fix (MCP server)** | `httpx.BasicAuth._auth_header` (private attribute, unreliable) replaced with explicit `base64.b64encode()` Basic Auth header construction. |
+| **Second workspace** | Full stack deployed to `adb-1098933906466604` (`pramod.borkar@neo4j.com`) — catalog `supplychain_optimizer`, schema `supply_chain_medallion`, secret scope `supply_chain`. |
+
+### Phase 1 — Core Stack
+
+| What | Detail |
+|------|--------|
+| **Synthetic data** | 200 suppliers, 500 parts, 50 facilities, ~12K shipments generated with Faker + Spark. |
+| **Medallion pipeline** | Lakeflow Spark Declarative Pipeline — Bronze (Auto Loader) → Silver (DQ) → Gold (5 materialized views). |
+| **Gradio app** | 3-way router (SQL / Graph / GDS) with model selector and adaptive thinking toggle. Deployed on Databricks Apps. |
+| **Neo4j graph** | Supplier/Part/Facility graph projected lazily from gold Delta tables into AuraDB on first question. |
+| **GDS projections** | `bom_network`, `supply_risk_network`, `facility_network` — in-memory named graphs for PageRank, Betweenness, Louvain, Node Similarity, WCC, Dijkstra. |
+| **Answer cache** | SHA-256 keyed Delta table with 24h TTL. |
