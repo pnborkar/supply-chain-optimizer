@@ -27,7 +27,14 @@ class GraphAgentModel(mlflow.pyfunc.PythonModel):
         neo4j_password = os.getenv("NEO4J_PASSWORD",    "")
 
         self.claude = anthropic.Anthropic(api_key=anthropic_key)
-        self.driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_username, neo4j_password))
+        self._neo4j_uri  = neo4j_uri
+        self._neo4j_auth = (neo4j_username, neo4j_password)
+        self.driver = GraphDatabase.driver(
+            neo4j_uri,
+            auth=self._neo4j_auth,
+            max_connection_lifetime=200,   # recycle connections before AuraDB drops them (~300s idle)
+            keep_alive=True,
+        )
 
         self.GRAPH_SYSTEM = """You are a Neo4j graph analyst for a supply chain network.
 The graph is already populated — run Cypher queries directly, no projection needed.
@@ -57,8 +64,20 @@ Node properties (use EXACTLY these names):
             elif isinstance(val, Path):         return [_convert(n) for n in val.nodes]
             elif isinstance(val, list):         return [_convert(v) for v in val]
             return val
-        with self.driver.session(database=self.neo4j_db) as s:
-            return [{k: _convert(v) for k, v in dict(r).items()} for r in s.run(cypher, params or {})]
+        # Retry once on connection failure — handles AuraDB idle timeout reconnect
+        for attempt in range(2):
+            try:
+                with self.driver.session(database=self.neo4j_db) as s:
+                    return [{k: _convert(v) for k, v in dict(r).items()} for r in s.run(cypher, params or {})]
+            except Exception as e:
+                if attempt == 0 and ("defunct" in str(e).lower() or "no data" in str(e).lower()):
+                    self.driver.close()
+                    self.driver = GraphDatabase.driver(
+                        self._neo4j_uri, auth=self._neo4j_auth,
+                        max_connection_lifetime=200, keep_alive=True,
+                    )
+                    continue
+                raise
 
     def predict(self, context, model_input):
         if isinstance(model_input, pd.DataFrame):
@@ -91,7 +110,11 @@ Node properties (use EXACTLY these names):
                 msgs.append({"role": "user", "content": results})
 
         # FIX: ai_query() requires "predictions" or "outputs" field — not OpenAI's "choices" format.
-        # Using "choices" caused REMOTE_FUNCTION_HTTP_RESULT_PARSE_ERROR when called via UC function.
+        # Strip non-ASCII (emojis, flags) AND ASCII control chars (0x00-0x1f except \n\t) that break
+        # ai_query JSON parsing. Also truncate to avoid payload size limits.
+        answer = answer.encode("ascii", errors="ignore").decode("ascii")
+        answer = "".join(c for c in answer if c >= " " or c in "\n\t")
+        answer = answer[:6000]
         return {"predictions": [answer]}
 
 

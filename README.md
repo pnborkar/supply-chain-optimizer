@@ -314,6 +314,19 @@ databricks apps deploy supply-chain-optimizer \
 
 ---
 
+## AgentBricks Supervisor
+
+The Supervisor routes questions between two tools: **Genie Space** (SQL/Delta) and the **Neo4j MCP server** (graph traversal + GDS algorithms). The screenshot below shows both tools configured, with a live PageRank result on the right.
+
+![AgentBricks Supervisor](docs/supervisor.jpg)
+
+| Tool | Type | Handles |
+|------|------|---------|
+| `agent-supply-chain-analytics` | Genie Space | Risk scores, PO aging, stock status, shipment delays, BOM cost rollups |
+| `mcp-neo4j-supply-chain` | Databricks App (MCP) | Supplier failure impact, BOM dependency chains, PageRank, community detection, shortest path |
+
+---
+
 ## Agent Routing Logic
 
 | Question Type | Route | Example |
