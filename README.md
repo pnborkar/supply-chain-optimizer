@@ -18,7 +18,7 @@ An AI-powered supply chain risk and disruption analysis tool built on Databricks
 <details>
 <summary><strong>Architecture 1 — Gradio App (Interactive)</strong></summary>
 
-![Architecture Gradio](docs/architecture_1.png)
+![Architecture Gradio](docs/architecture_3.jpg)
 
 Route agent inside the Gradio app classifies each question and dispatches to SQL, Graph, or GDS agent. Graph is projected lazily from Delta gold tables on first use and persists in AuraDB. Answers are cached in a Delta table with a 24h TTL.
 
