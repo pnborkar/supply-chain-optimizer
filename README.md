@@ -24,8 +24,8 @@ Route agent inside the Gradio app classifies each question and dispatches to SQL
 
 </details>
 
-<details>
-<summary><strong>Architecture 2 — AgentBricks Supervisor (Production)</strong></summary>
+<details open>
+<summary><strong>Architecture 2 — AgentBricks Supervisor</strong></summary>
 
 ![Architecture Supervisor](docs/architecture_2.jpg)
 
