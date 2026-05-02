@@ -65,41 +65,38 @@ User Question
 ### Agent Layer — AgentBricks Supervisor (Production)
 
 ```
+Lakeflow Medallion Pipeline (scheduled)
+      ↓
+Gold Delta Tables
+      ↓
+project_graph.py (Databricks Job Task — runs after pipeline)
+      ↓
+Neo4j AuraDB (idempotent MERGE — nodes + relationships kept in sync)
+      ↓
 User Question
       ↓
 AgentBricks Supervisor (Mosaic AI)
       ├── Genie Space          →  SQL against gold Delta tables                →  Answer
-      ├── graph_agent()        →  UC Function → ai_query()
-      │                               ↓
-      │                        supply-chain-graph-agent (MLflow Serving Endpoint)
-      │                               ↓
-      │                        GraphAgentModel.predict() → Neo4j Cypher       →  Answer
-      └── gds_agent()          →  UC Function → ai_query()
-                                      ↓
-                               supply-chain-gds-agent (MLflow Serving Endpoint)
-                                      ↓
-                               GDSAgentModel.predict() → GDS algorithms       →  Answer
-
-MLflow Model Lifecycle:
-  graph_agent_model.py / gds_agent_model.py   (model code)
-          ↓  mlflow.pyfunc.log_model()
-  Unity Catalog Registered Model              (versioned)
-          ↓  serving endpoint points to version
-  Model Serving Endpoint                      (serverless, scale-to-zero)
-          ↓  ai_query()
-  UC Function                                 (tool in Supervisor)
+      └── mcp-neo4j-supply-chain  →  Neo4j MCP Server (Databricks App)
+                                          ↓
+                                   Cypher + GDS algorithms → AuraDB           →  Answer
 ```
 
 ### Neo4j Graph Population
 
 ```
-Gradio App (first question) OR Pipeline Job (scheduled)
+Gradio App (interactive — lazy on first question)
       ↓
   _project() reads gold Delta tables → writes Supplier/Part/Facility nodes
+
+Databricks Job: supply_chain_full_pipeline (scheduled)
+  Task 1: supply_chain_medallion_pipeline  (Lakeflow — Bronze → Silver → Gold)
+      ↓  (depends on Task 1)
+  Task 2: project_graph.py                (idempotent MERGE → Neo4j AuraDB)
       ↓
-Neo4j AuraDB (persistent — survives restarts)
+Neo4j AuraDB (persistent — grows incrementally with each pipeline run)
       ↓
-MLflow Serving Endpoints + MCP Server read directly (no re-projection)
+MCP Server reads directly (no re-projection needed at query time)
 ```
 
 ---
@@ -505,6 +502,7 @@ Wrap agents as proper MLflow models, serve via Databricks Model Serving endpoint
 | **AgentBricks Supervisor** | Supply Chain Supervisor created with Genie Space (SQL) + UC function tools (Graph + GDS). |
 | **Neo4j MCP server** | `mcp-neo4j-supply-chain` Databricks App — deploys official `neo4j-mcp-server` package as a FastAPI proxy. Registered in Unity ML Gateway MCP Catalog. |
 | **MLflow slim agents** | Graph and GDS model files refactored — removed `WorkspaceClient`, Delta SQL reads, and subgraph projection. Agents now assume graph is pre-populated in AuraDB and read credentials from env vars. `_full` backup copies retained. |
+| **Neo4j graph sync job** | `agents/project_graph.py` — Databricks notebook that reads gold Delta tables and upserts all nodes/relationships into AuraDB via idempotent MERGE. Runs as Task 2 in `supply_chain_full_pipeline` job, dependent on the Lakeflow pipeline task. |
 | **Auth fix (MCP server)** | `httpx.BasicAuth._auth_header` (private attribute, unreliable) replaced with explicit `base64.b64encode()` Basic Auth header construction. |
 | **Second workspace** | Full stack deployed to `adb-1098933906466604` — catalog `supplychain_optimizer`, schema `supply_chain_medallion`, secret scope `supply_chain`. |
 
