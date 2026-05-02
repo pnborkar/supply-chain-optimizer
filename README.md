@@ -143,7 +143,7 @@ Are there any isolated or disconnected parts in the BOM? (WCC)
 The Supervisor routes questions between two tools: **Genie Space** (SQL/Delta) and the **Neo4j MCP server** (graph traversal + GDS algorithms). The screenshot below shows both tools configured, with a live PageRank result on the right.
 
 > [!NOTE]
-> **Note:** The Neo4j MCP server is the preferred approach for all graph and GDS questions. It executes Cypher and GDS algorithms directly against AuraDB with no intermediate layers, no response format constraints, and no cold-start latency — producing richer, more accurate answers than the MLflow serving endpoint route.
+> The Neo4j MCP server is the preferred approach for all graph and GDS questions. It executes Cypher and GDS algorithms directly against AuraDB with no intermediate layers, no response format constraints, and no cold-start latency — producing richer, more accurate answers than the MLflow serving endpoint route.
 
 ![AgentBricks Supervisor](docs/supervisor.jpg)
 
