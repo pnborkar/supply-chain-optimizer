@@ -100,9 +100,13 @@ Are there any isolated or disconnected parts in the BOM? (WCC)
 | Layer | Technology |
 |-------|-----------|
 | Data platform | Databricks (Serverless) |
-| Storage | Delta Lake / Unity Catalog |
+| Storage | Delta Lake |
+| Governance & lineage | Unity Catalog — data lineage, secret scopes, UC functions, model registry |
 | Pipeline | Lakeflow Spark Declarative Pipelines (SQL) |
+| Agent orchestration | AgentBricks / Mosaic AI — Supervisor routing between tools |
+| Natural language SQL | Genie Space — SQL Q&A against gold Delta tables |
 | Agent framework | Claude Opus 4.6 / Sonnet 4.6 / Haiku 4.5 (Anthropic SDK) — tool use, adaptive thinking |
+| Graph protocol | MCP (Model Context Protocol) — Neo4j MCP server hosted on Databricks Apps |
 | Graph algorithms | Neo4j GDS (PageRank, Betweenness Centrality, Louvain, Node Similarity, WCC, Dijkstra) |
 | Graph database | Neo4j AuraDB |
 | Application hosting | Databricks Apps (Serverless Compute) |
