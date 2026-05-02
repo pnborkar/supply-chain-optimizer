@@ -68,6 +68,33 @@ Are there any isolated or disconnected parts in the BOM? (WCC)
 
 </details>
 
+<details>
+<summary><strong>Data Flow</strong></summary>
+
+```
+Synthetic Data (Faker + Spark)
+        ↓
+/Volumes/supplychain/supply_chain_raw/landing/
+        ↓
+Lakeflow Spark Declarative Pipeline (Serverless)
+        ↓
+supplychain.supply_chain_medallion
+  Bronze (6 streaming tables)  →  Silver (6 streaming tables)  →  Gold (5 materialized views)
+        ↓
+Databricks Job: supply_chain_full_pipeline
+  Task 1: supply_chain_medallion_pipeline  (Lakeflow — Bronze → Silver → Gold)
+      ↓  (depends on Task 1)
+  Task 2: project_graph.py                (idempotent MERGE → Neo4j AuraDB)
+        ↓
+Neo4j AuraDB (persistent — grows incrementally with each pipeline run)
+        ↓
+AgentBricks Supervisor
+  ├── Genie Space          →  SQL against gold Delta tables   →  Answer
+  └── Neo4j MCP Server     →  Cypher + GDS algorithms         →  Answer
+```
+
+</details>
+
 ---
 
 ## Tech Stack
