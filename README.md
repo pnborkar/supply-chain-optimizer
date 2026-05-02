@@ -188,6 +188,8 @@ The Supervisor routes questions between two tools: **Genie Space** (SQL/Delta) a
 
 ### Neo4j Graph Schema
 
+![Neo4j Graph Schema](docs/schema.jpg)
+
 ```
 (:Supplier)-[:SUPPLIES {po_count, avg_delay_days}]->(:Part)
 (:Part)-[:REQUIRES {quantity, depth}]->(:Part)
