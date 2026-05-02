@@ -159,6 +159,8 @@ The Supervisor routes questions between two tools: **Genie Space** (SQL/Delta) a
 
 ## Application Running on Databricks Apps
 
+The Gradio app runs entirely on Databricks serverless compute — no external hosting needed. Includes a model selector (Opus / Sonnet / Haiku), adaptive thinking toggle, and a 3-way router that dispatches each question to the right agent (SQL, Graph, or GDS).
+
 ![Databricks App](docs/databricks_app.png)
 
 ---
