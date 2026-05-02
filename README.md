@@ -149,6 +149,8 @@ The Supervisor routes questions between two tools: **Genie Space** (SQL/Delta) a
 | `agent-supply-chain-analytics` | Genie Space | Risk scores, PO aging, stock status, shipment delays, BOM cost rollups |
 | `mcp-neo4j-supply-chain` | Databricks App (MCP) | Supplier failure impact, BOM dependency chains, PageRank, community detection, shortest path |
 
+> **Prerequisite:** The Neo4j MCP server reads directly from AuraDB at query time — the graph must be populated before using the Supervisor. Run the `supply_chain_full_pipeline` job (pipeline + `project_graph.py`) at least once to load nodes and relationships into AuraDB.
+
 ---
 
 ## Application Running on Databricks Apps
