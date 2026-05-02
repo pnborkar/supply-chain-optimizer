@@ -295,11 +295,45 @@ In **Mosaic AI → AgentBricks**, create a Supervisor with two tools:
 
 Use these descriptions for correct routing:
 
-**Supervisor:** *Routes SQL questions (risk scores, PO aging, stock status, shipment delays) to Genie Space. Routes ALL graph, network, hub, centrality, clustering, or algorithm questions to Neo4j MCP. When in doubt, use Neo4j MCP.*
+**Supervisor:**
+```
+Routes supply chain questions between two tools:
 
-**Genie Space:** *SQL ONLY. Do NOT use if the question contains: network, hub, centrality, PageRank, bottleneck, community, cluster, similarity, shortest path, cascading, graph algorithm, routing hub, WCC, Louvain, depends on, impact if fails.*
+1. Genie Space (SQL) — ONLY for: counts, totals, rankings, risk scores, stock status, PO aging,
+   shipment delay stats, BOM cost rollups. Answers come from Delta tables.
 
-**Neo4j MCP:** *Use for ALL graph relationship, network analysis, and graph algorithm questions — supplier failure impact, BOM chains, PageRank, betweenness centrality, Louvain community detection, node similarity, shortest path, facility hub analysis.*
+2. Neo4j MCP (Graph) — ONLY for: ANY question containing words like "network", "hub",
+   "centrality", "PageRank", "bottleneck", "community", "cluster", "similarity", "shortest path",
+   "depends on", "impact if", "fails", "cascading", "disconnected", "WCC", "Louvain", "graph",
+   "BOM chain", "routing hub". Answers require graph traversal or algorithms.
+
+When in doubt, use Neo4j MCP.
+```
+
+**Genie Space:**
+```
+SQL ONLY. Do NOT use if the question contains: network, hub, centrality, PageRank, bottleneck,
+community, cluster, similarity, shortest path, cascading, graph algorithm, routing hub, WCC,
+Louvain, depends on, impact if fails.
+
+Answers structured data questions about supplier risk scores, part availability and stock status,
+purchase order aging, shipment delays, and BOM cost rollups. Use ONLY for aggregation, ranking,
+and filtering.
+```
+
+**Neo4j MCP:**
+```
+Use this tool for ALL questions involving graph relationships, network analysis, and graph algorithms. This includes:
+- Facility hub analysis: which facilities are the most critical routing hubs, most connected nodes in the shipment network
+- Supplier failure impact: what parts are at risk if a supplier fails, cascading disruptions
+- Dependency analysis: BOM chains, which assemblies depend on a component
+- Single points of failure: critical parts with only one supplier
+- Geographic disruptions: impact if all China/region suppliers are disrupted
+- Graph algorithms: PageRank ranking of parts by importance, betweenness centrality bottlenecks,
+  Louvain community/cluster detection, node similarity between suppliers, shortest path analysis,
+  disconnected components (WCC)
+- Network structure: most connected suppliers, hub facilities, supplier-part clusters
+```
 
 </details>
 
