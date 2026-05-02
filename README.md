@@ -60,39 +60,6 @@ Delta Answer Cache (TTL 24h)
 
 ---
 
-<details>
-<summary><strong>Example Questions</strong></summary>
-
-**SQL — Delta Lake**
-```
-Which suppliers have Critical risk scores?
-Show me all delayed purchase orders over 30 days old
-What are the top 10 most expensive BOM assemblies?
-Which shipments have High or Critical disruption severity?
-What is the stock status for critical parts?
-```
-
-**Graph — Neo4j Cypher traversal**
-```
-What parts are at risk if our highest-risk supplier fails?
-Which critical parts have only a single supplier?
-What assemblies would be affected if Tier-1 suppliers from China are disrupted?
-Show me the most depended-upon components in the BOM network
-Which carrier routes have the most disrupted shipments?
-```
-
-**GDS — Neo4j Graph Algorithms**
-```
-Which parts are the biggest structural bottlenecks in the BOM? (Betweenness Centrality)
-Rank parts by how many assemblies depend on them using PageRank
-Which suppliers have the most similar part portfolios? (Node Similarity)
-Detect supplier-part communities — which clusters are most exposed to risk? (Louvain)
-Which facilities are the most critical routing hubs in the shipment network?
-Are there any isolated or disconnected parts in the BOM? (WCC)
-```
-
-</details>
-
 ---
 
 ## Tech Stack
