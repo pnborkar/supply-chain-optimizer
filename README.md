@@ -15,17 +15,8 @@ An AI-powered supply chain risk and disruption analysis tool built on Databricks
 
 ## Architecture
 
-<details>
-<summary><strong>Architecture 1 — Gradio App (Interactive)</strong></summary>
-
-![Architecture Gradio](docs/architecture_3.jpg)
-
-Route agent inside the Gradio app classifies each question and dispatches to SQL, Graph, or GDS agent. Graph is projected lazily from Delta gold tables on first use and persists in AuraDB. Answers are cached in a Delta table with a 24h TTL.
-
-</details>
-
 <details open>
-<summary><strong>Architecture 2 — AgentBricks Supervisor</strong></summary>
+<summary><strong>Architecture 1 — AgentBricks Supervisor</strong></summary>
 
 ![Architecture Supervisor](docs/architecture_2.jpg)
 
@@ -33,9 +24,19 @@ AgentBricks Supervisor routes between Genie Space (SQL/Delta) and the Neo4j MCP 
 
 </details>
 
+<details>
+<summary><strong>Architecture 2 — Gradio App (Interactive)</strong></summary>
+
+![Architecture Gradio](docs/architecture_3.jpg)
+
+Route agent inside the Gradio app classifies each question and dispatches to SQL, Graph, or GDS agent. Graph is projected lazily from Delta gold tables on first use and persists in AuraDB. Answers are cached in a Delta table with a 24h TTL.
+
+</details>
+
 ---
 
-## Example Questions
+<details>
+<summary><strong>Example Questions</strong></summary>
 
 **SQL — Delta Lake**
 ```
@@ -64,6 +65,8 @@ Detect supplier-part communities — which clusters are most exposed to risk? (L
 Which facilities are the most critical routing hubs in the shipment network?
 Are there any isolated or disconnected parts in the BOM? (WCC)
 ```
+
+</details>
 
 ---
 
