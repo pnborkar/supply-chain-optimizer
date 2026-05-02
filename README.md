@@ -275,6 +275,32 @@ Create a Databricks Job `supply_chain_full_pipeline` with two tasks:
 
 This keeps Neo4j AuraDB in sync with gold Delta tables after every pipeline run.
 
+### 7. Deploy Neo4j MCP Server (Databricks App)
+
+Upload `mcp_neo4j/` to your workspace and deploy as a Databricks App:
+
+```bash
+databricks workspace import-dir mcp_neo4j /Workspace/Users/<your-email>/mcp-neo4j-supply-chain --overwrite
+databricks apps deploy mcp-neo4j-supply-chain \
+  --source-code-path /Workspace/Users/<your-email>/mcp-neo4j-supply-chain
+```
+
+Add secret resources to the app: `neo4j-uri`, `neo4j-username`, `neo4j-password`, `neo4j-database` from the `supply_chain` secret scope.
+
+### 8. Configure AgentBricks Supervisor
+
+In **Mosaic AI → AgentBricks**, create a Supervisor with two tools:
+- **Genie Space** — connect to your `Supply Chain Analytics` Genie space
+- **Neo4j MCP** — connect to the `mcp-neo4j-supply-chain` Databricks App
+
+Use these descriptions for correct routing:
+
+**Supervisor:** *Routes SQL questions (risk scores, PO aging, stock status, shipment delays) to Genie Space. Routes ALL graph, network, hub, centrality, clustering, or algorithm questions to Neo4j MCP. When in doubt, use Neo4j MCP.*
+
+**Genie Space:** *SQL ONLY. Do NOT use if the question contains: network, hub, centrality, PageRank, bottleneck, community, cluster, similarity, shortest path, cascading, graph algorithm, routing hub, WCC, Louvain, depends on, impact if fails.*
+
+**Neo4j MCP:** *Use for ALL graph relationship, network analysis, and graph algorithm questions — supplier failure impact, BOM chains, PageRank, betweenness centrality, Louvain community detection, node similarity, shortest path, facility hub analysis.*
+
 </details>
 
 <details>
