@@ -60,8 +60,6 @@ Delta Answer Cache (TTL 24h)
 
 ---
 
----
-
 ## Tech Stack
 
 | Layer | Technology |
