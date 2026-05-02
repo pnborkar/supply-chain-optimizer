@@ -1,4 +1,4 @@
-# Neo4j-Augmented Supply Chain Optimization on Databricks
+# Graph-Powered Supply Chain Analytics on Databricks
 
 [![Databricks](https://img.shields.io/badge/DATABRICKS-ENABLED-FF3621?style=for-the-badge&logo=databricks&logoColor=white)]()
 [![Neo4j](https://img.shields.io/badge/NEO4J-AuraDB-brightgreen?style=for-the-badge&logo=neo4j&logoColor=white)]()

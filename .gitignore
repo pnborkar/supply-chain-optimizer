@@ -37,3 +37,8 @@ agents/supply_chain_agent_notebook.py
 
 # Logs
 *.log
+
+# Backup / copy files
+README_original.md
+*_copy.*
+*_full.py
