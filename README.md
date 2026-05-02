@@ -22,6 +22,20 @@ An AI-powered supply chain risk and disruption analysis tool built on Databricks
 
 AgentBricks Supervisor routes between Genie Space (SQL/Delta) and the Neo4j MCP server (graph + GDS algorithms), hosted as a Databricks App. Unity Catalog provides governance, model routing, and audit across the full stack.
 
+```
+Lakeflow Medallion Pipeline (scheduled)
+        ↓
+Gold Delta Tables
+        ↓
+project_graph.py (Databricks Job Task — runs after pipeline)
+        ↓
+Neo4j AuraDB (idempotent MERGE — nodes + relationships kept in sync)
+        ↓
+User Question → AgentBricks Supervisor
+  ├── Genie Space        →  SQL against gold Delta tables   →  Answer
+  └── Neo4j MCP Server   →  Cypher + GDS algorithms         →  Answer
+```
+
 </details>
 
 <details>
@@ -30,6 +44,17 @@ AgentBricks Supervisor routes between Genie Space (SQL/Delta) and the Neo4j MCP 
 ![Architecture Gradio](docs/architecture_3.jpg)
 
 Route agent inside the Gradio app classifies each question and dispatches to SQL, Graph, or GDS agent. Graph is projected lazily from Delta gold tables on first use and persists in AuraDB. Answers are cached in a Delta table with a 24h TTL.
+
+```
+Synthetic Data → Lakeflow Pipeline → Gold Delta Tables
+        ↓
+User Question → Router Agent (Claude)
+  ├── SQL Agent    →  spark.sql() on gold tables       →  Answer
+  ├── Graph Agent  →  lazy project → Neo4j Cypher      →  Answer
+  └── GDS Agent    →  gds.graph.project() → algorithm  →  Answer
+        ↓
+Delta Answer Cache (TTL 24h)
+```
 
 </details>
 
@@ -64,33 +89,6 @@ Which suppliers have the most similar part portfolios? (Node Similarity)
 Detect supplier-part communities — which clusters are most exposed to risk? (Louvain)
 Which facilities are the most critical routing hubs in the shipment network?
 Are there any isolated or disconnected parts in the BOM? (WCC)
-```
-
-</details>
-
-<details>
-<summary><strong>Data Flow</strong></summary>
-
-```
-Synthetic Data (Faker + Spark)
-        ↓
-/Volumes/supplychain/supply_chain_raw/landing/
-        ↓
-Lakeflow Spark Declarative Pipeline (Serverless)
-        ↓
-supplychain.supply_chain_medallion
-  Bronze (6 streaming tables)  →  Silver (6 streaming tables)  →  Gold (5 materialized views)
-        ↓
-Databricks Job: supply_chain_full_pipeline
-  Task 1: supply_chain_medallion_pipeline  (Lakeflow — Bronze → Silver → Gold)
-      ↓  (depends on Task 1)
-  Task 2: project_graph.py                (idempotent MERGE → Neo4j AuraDB)
-        ↓
-Neo4j AuraDB (persistent — grows incrementally with each pipeline run)
-        ↓
-AgentBricks Supervisor
-  ├── Genie Space          →  SQL against gold Delta tables   →  Answer
-  └── Neo4j MCP Server     →  Cypher + GDS algorithms         →  Answer
 ```
 
 </details>
