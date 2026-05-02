@@ -165,6 +165,8 @@ The Supervisor routes questions between two tools: **Genie Space** (SQL/Delta) a
 <details>
 <summary><strong>Data Model</strong></summary>
 
+The dataset simulates a mid-size manufacturer sourcing parts from a global supplier network. Suppliers span multiple countries and tiers, parts range from raw materials to sub-assemblies, and shipments flow through regional facilities. All data is synthetically generated using Faker + Spark — realistic enough to demonstrate real supply chain risk patterns like cascading disruptions, single points of failure, and geographic concentration risk.
+
 ### Synthetic Domain Entities
 
 | Entity | Count | Key Fields |
