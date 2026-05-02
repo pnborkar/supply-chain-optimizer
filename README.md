@@ -256,7 +256,7 @@ Open `agents/supply_chain_agent_notebook` in your Databricks workspace:
 - **Run All** once to initialize
 - Update the **Question** widget and run the last cell for each query
 
-### 5. Deploy the Gradio App on Databricks Apps
+### 5. Deploy the Gradio App on Databricks Apps *(Architecture 2 — Interactive route)*
 
 ```bash
 databricks workspace import-dir app /Workspace/Users/<your-email>/supply-chain-optimizer --overwrite
@@ -275,7 +275,7 @@ databricks grants update schema supplychain.supply_chain_medallion \
   --json "{\"changes\": [{\"principal\": \"$SP\", \"add\": [\"USE SCHEMA\", \"SELECT\", \"MODIFY\", \"CREATE TABLE\"]}]}"
 ```
 
-### 6. Schedule Neo4j Graph Sync
+### 6. Schedule Neo4j Graph Sync *(AgentBricks route)*
 
 Create a Databricks Job `supply_chain_full_pipeline` with two tasks:
 - **Task 1** — Pipeline task: `supply_chain_medallion_pipeline`
@@ -283,7 +283,7 @@ Create a Databricks Job `supply_chain_full_pipeline` with two tasks:
 
 This keeps Neo4j AuraDB in sync with gold Delta tables after every pipeline run.
 
-### 7. Deploy Neo4j MCP Server (Databricks App)
+### 7. Deploy Neo4j MCP Server *(AgentBricks route)*
 
 Upload `mcp_neo4j/` to your workspace and deploy as a Databricks App:
 
