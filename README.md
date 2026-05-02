@@ -11,6 +11,10 @@
 
 An AI-powered supply chain risk and disruption analysis tool built on Databricks. Answers natural-language questions about supplier risk, part availability, shipment disruptions, and BOM dependencies — routing intelligently between SQL (Delta Lake), graph traversal (Neo4j AuraDB), and graph algorithms (Neo4j GDS).
 
+> - **SQL alone isn't enough** — questions like "what happens if this supplier fails?" require graph traversal across BOM dependencies, not aggregations on flat tables
+> - **Neo4j GDS on AuraDB** runs PageRank, community detection, and shortest path directly on the graph in memory — far faster than recomputing from Delta tables on every query
+> - **AgentBricks Supervisor + MCP** means no custom routing code — the Supervisor picks the right tool (Genie for SQL, Neo4j MCP for graph) based on the question, with Unity Catalog handling governance end-to-end
+
 ---
 
 ## Architecture
